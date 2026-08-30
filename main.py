@@ -16,11 +16,21 @@ app = FastAPI(
 
 # Create a POST endpoint for document verification
 @app.post("/api/v1/verify", response_model=VerificationResponse)
-async def verify_document():
+async def verify_document(
+    document_image: UploadFile = File(..., description="High-res scan of the ID"),
+    live_frame: UploadFile = File(..., description="Live webcam frame for DeepFace matching")
+):
     """
-    This endpoint will eventually accept multipart/form-data (images + live video).
-    For now, it returns a mock JSON response based on our Pydantic API contract.
+    Accepts multipart/form-data file uploads.
+    Currently returns mock JSON, but will soon pass these files to Pair 1's AI models.
     """
+    # 1. Read the raw bytes of the uploaded files into memory
+    doc_bytes = await document_image.read()
+    live_bytes = await live_frame.read()
+
+    # (Future Step: Pass doc_bytes and live_bytes to Pair 1's AI scripts here)
+
+    # 2. Return the mock Pydantic response
     return VerificationResponse(
         session_id="nx_8839201",
         risk_score=92.5,
@@ -43,6 +53,6 @@ async def verify_document():
             is_live_match=True,
             confidence_score=0.98
         ),
-        evidence_chain="Math Trap triggered: MRZ checksum mismatch detected. Pixel Trap triggered: High ELA anomaly score in the photograph zone.",
+        evidence_chain="Math Trap triggered: MRZ checksum mismatch detected. Pixel Trap triggered: High ELA anomaly score.",
         audit_hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     )
