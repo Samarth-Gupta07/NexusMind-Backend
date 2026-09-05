@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from schemas import (
     VerificationResponse,
     ExtractedDocumentData,
@@ -13,8 +14,39 @@ from schemas import (
 from mrz_validator import validate_mrz
 from ocr_engine import run_ocr  # Adjust filename if named differently
 from vision_forencis import analyze_document
+from llm_evidence import generate_evidence_chain
 
 app = FastAPI(title="NexusMind Gateway", version="1.0.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
+
+
+def generate_evidence_chain(is_mrz_valid: bool, forensics_data: dict) -> str:
+    """Create a concise, auditable explanation of the verification decision."""
+    evidence = [
+        (
+            "MRZ validation passed: all available ICAO checksum checks matched."
+            if is_mrz_valid
+            else "MRZ validation failed: " + "; ".join(forensics_data.get("mrz_errors", []))
+        ),
+        (
+            "Pixel-forensics check flagged high-risk visual anomalies."
+            if forensics_data["risk_level"] == "HIGH"
+            else f"Pixel-forensics check returned {forensics_data['risk_level'].lower()} risk."
+        ),
+    ]
+
+    reasons = forensics_data.get("reasons", [])
+    if reasons:
+        evidence.append("Forensic findings: " + "; ".join(reasons) + ".")
+
+    return " ".join(evidence)
+
 
 @app.post("/api/v1/verify", response_model=VerificationResponse)
 async def verify_document(
@@ -43,18 +75,26 @@ async def verify_document(
             # Fallback if OCR does not detect full 44-character lines
             mrz_result = validate_mrz("", "")
 
-        # 4. Compute Dynamic Scores based on real validation results
-        is_valid = mrz_result.valid
-        risk_score = 10.0 if is_valid else 95.0
-        status = "PASSED" if is_valid else "FLAGGED"
-        evidence = (
-            "All MRZ checksums verified successfully."
-            if is_valid
-            else f"Math Trap triggered: {', '.join(mrz_result.errors)}"
+        # 4. Combine independent MRZ and pixel-forensics checks.
+        forensics_data = analyze_document(temp_path)
+        is_mrz_valid = mrz_result.valid
+        is_pixel_tampered = forensics_data["risk_level"] == "HIGH"
+        is_valid = is_mrz_valid and not is_pixel_tampered
+        risk_score = max(
+            0.0 if is_mrz_valid else 95.0,
+            float(forensics_data["suspicion_score"]),
         )
+        status = "PASSED" if is_valid else "FLAGGED"
+
+        # Keep MRZ failures alongside the forensic facts for an evidence chain.
+        forensics_data["mrz_errors"] = mrz_result.errors
+        evidence = generate_evidence_chain(is_mrz_valid, forensics_data)
 
         # 5. Generate SHA-256 Audit Hash for Blockchain Ledger
-        payload_string = f"{mrz_result.passport_number}:{risk_score}:{status}"
+        payload_string = (
+            f"{mrz_result.passport_number}:{risk_score}:{status}:"
+            f"{forensics_data['risk_level']}"
+        )
         audit_hash = hashlib.sha256(payload_string.encode()).hexdigest()
 
         # 6. Map results into schemas.py response contract
@@ -72,8 +112,8 @@ async def verify_document(
                 )
             ),
             forensics=AnomalyDetectionResult(
-                pixel_tamper_detected=not is_valid,
-                ela_anomaly_score=0.85 if not is_valid else 0.05,
+                pixel_tamper_detected=is_pixel_tampered,
+                ela_anomaly_score=forensics_data["ela_score"],
                 gradcam_heatmap_base64="data:image/png;base64,..."
             ),
             biometrics=BiometricResult(
