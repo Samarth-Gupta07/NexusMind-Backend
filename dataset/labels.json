@@ -1,0 +1,68 @@
+[
+  {
+    "file": "valid/sample_passport_valid.jpg",
+    "document_type": "passport",
+    "label": "valid",
+    "tamper_type": null,
+    "mrz_line1": "P<UTOSHARMA<<ROHIT<KUMAR<<<<<<<<<<<<<<<<<<<<",
+    "mrz_line2": "X1234567<7UTO9607158M3001019<<<<<<<<<<<<<<<6",
+    "notes": "Clean baseline; all checksums valid."
+  },
+  {
+    "file": "valid/sample_passport_valid_scan.jpg",
+    "document_type": "passport",
+    "label": "valid",
+    "tamper_type": null,
+    "mrz_line1": "P<UTOSHARMA<<ROHIT<KUMAR<<<<<<<<<<<<<<<<<<<<",
+    "mrz_line2": "X1234567<7UTO9607158M3001019<<<<<<<<<<<<<<<6",
+    "notes": "Same data as sample_passport_valid.jpg but rotated/blurred/noisy like a phone photo. Use to test ocr_engine.py robustness, not forensics."
+  },
+  {
+    "file": "tampered/sample_passport_tampered_obvious.jpg",
+    "document_type": "passport",
+    "label": "tampered",
+    "tamper_type": "obvious",
+    "mrz_line1": "P<UTOSHARMA<<ROHIT<KUMAR<<<<<<<<<<<<<<<<<<<<",
+    "mrz_line2": "X1234567<7UTO9607158M3512319<<<<<<<<<<<<<<<6",
+    "notes": "Expiry field visually edited in a mismatched font; one MRZ character redrawn in a different font; fake photo-splice seam. Checksum invalid on expiry + composite."
+  },
+  {
+    "file": "tampered/sample_passport_tampered_subtle.jpg",
+    "document_type": "passport",
+    "label": "tampered",
+    "tamper_type": "subtle",
+    "mrz_line1": "P<UTOSHARMA<<ROHIT<KUMAR<<<<<<<<<<<<<<<<<<<<",
+    "mrz_line2": "X1234567<7UTO9607158M3001019<<<<<<<<<<<<<<<7",
+    "notes": "Visually IDENTICAL to sample_passport_valid.jpg. Only the final MRZ composite check digit differs (invisible to the eye), and the MRZ band was re-compressed at a lower JPEG quality than the rest of the image -- an ELA/double-compression check should flag this region."
+  },
+  {
+    "file": "valid/sample_idcard_valid.jpg",
+    "document_type": "national_id_card",
+    "label": "valid",
+    "tamper_type": null,
+    "qr_payload": "UTOPIA-ID|UT-2847-1193-6650|ANITA DESHMUKH|12 MAR 1994",
+    "printed_fields": {
+      "id_number": "UT-2847-1193-6650",
+      "name": "ANITA DESHMUKH",
+      "dob": "12 MAR 1994",
+      "gender": "FEMALE",
+      "address": "14 LAKEVIEW ROAD, NEW HARBOR, UTOPIA"
+    },
+    "notes": "Printed fields match the QR payload exactly."
+  },
+  {
+    "file": "tampered/sample_idcard_tampered_obvious.jpg",
+    "document_type": "national_id_card",
+    "label": "tampered",
+    "tamper_type": "obvious",
+    "qr_payload": "UTOPIA-ID|UT-2847-1193-6650|ANITA DESHMUKH|12 MAR 1994",
+    "printed_fields": {
+      "id_number": "UT-2847-1193-6650",
+      "name": "ANITA DESHMUKH",
+      "dob": "12 MAR 1994",
+      "gender": "FEMALE",
+      "address": "14 LAKEVIEW ROAD, NEW HARBOR, UTOPIA"
+    },
+    "notes": "Name field rendered in a visibly mismatched font/colour. The QR code still encodes the ORIGINAL name -- decoding it and comparing against the OCR'd name field is an independent way to catch this tamper."
+  }
+]
